@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Retro Hoop 🏀</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
+
+  body {
+    background: #1a0a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Press Start 2P', monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #game-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 10px;
+  }
+
+  /* SCOREBOARD */
+  #scoreboard {
+    background: #0d0d1a;
+    border: 3px solid #ff6b00;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    box-shadow: 0 0 20px #ff6b0066;
+  }
+  .team-score { text-align: center; }
+  .team-name { font-size: 7px; color: #ff6b00; margin-bottom: 4px; }
+  .score-num { font-size: 28px; color: #fff; text-shadow: 0 0 10px #ff6b00; }
+  #game-info { text-align: center; }
+  #quarter-display { font-size: 7px; color: #aaa; margin-bottom: 4px; }
+  #clock-display { font-size: 16px; color: #ffdd00; text-shadow: 0 0 8px #ffdd00; }
+  #possession-arrow { font-size: 10px; color: #00ffaa; margin-top: 3px; }
+
+  /* COURT */
+  #court-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #b8620a;
+    border: 3px solid #ff6b00;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  canvas#court { width: 100%; height: 100%; display: block; }
+
+  /* MESSAGE OVERLAY */
+  #msg-overlay {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    border: 2px solid #ff6b00;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 10px;
+    color: #fff;
+    text-align: center;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  #msg-overlay.show { display: block; animation: pop 0.2s ease; }
+  @keyframes pop { from { transform: translate(-50%,-50%) scale(0.7); } to { transform: translate(-50%,-50%) scale(1); } }
+
+  /* PLAY PICKER */
+  #play-area {
+    background: #0d0d1a;
+    border: 3px solid #ff6b00;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+  #play-title {
+    font-size: 7px;
+    color: #ff6b00;
+    text-align: center;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  #play-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+  .play-btn {
+    background: #1a1a3e;
+    border: 2px solid #4444aa;
+    border-radius: 6px;
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    padding: 10px 6px;
+    cursor: pointer;
+    transition: all 0.1s;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .play-btn:active, .play-btn.selected {
+    background: #ff6b00;
+    border-color: #ffaa00;
+    transform: scale(0.96);
+    color: #000;
+  }
+  .play-btn .play-icon { font-size: 14px; display: block; margin-bottom: 3px; }
+  .play-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+  /* EXECUTE BUTTON */
+  #execute-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #ff6b00, #ff9900);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    padding: 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 0 #aa4400;
+    transition: all 0.1s;
+    margin-bottom: 8px;
+  }
+  #execute-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #aa4400; }
+  #execute-btn:disabled { background: #333; color: #666; box-shadow: none; pointer-events: none; }
+
+  /* STATUS BAR */
+  #status-bar {
+    font-size: 7px;
+    color: #aaa;
+    text-align: center;
+    min-height: 14px;
+    padding: 0 4px;
+  }
+
+  /* TITLE SCREEN */
+  #title-screen {
+    position: fixed;
+    inset: 0;
+    background: #1a0a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  #title-screen h1 {
+    font-size: 28px;
+    color: #ff6b00;
+    text-shadow: 0 0 20px #ff6b00, 0 4px 0 #aa3300;
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+  }
+  #title-screen .subtitle {
+    font-size: 8px;
+    color: #ffdd00;
+    margin-bottom: 30px;
+    text-shadow: 0 0 8px #ffdd00;
+  }
+  #title-ball { font-size: 60px; margin-bottom: 20px; animation: bounce 0.8s infinite alternate; }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+  #start-btn {
+    background: linear-gradient(135deg, #ff6b00, #ff9900);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    padding: 16px 32px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #aa4400;
+    margin-bottom: 20px;
+  }
+  #start-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #aa4400; }
+  .instructions { font-size: 6px; color: #777; text-align: center; line-height: 2.2; max-width: 280px; }
+
+  /* GAME OVER */
+  #gameover-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  #gameover-screen.show { display: flex; }
+  #gameover-title { font-size: 20px; color: #ff6b00; margin-bottom: 10px; text-align: center; }
+  #final-score { font-size: 12px; color: #fff; margin-bottom: 6px; text-align: center; line-height: 2; }
+  #result-msg { font-size: 9px; color: #ffdd00; margin-bottom: 24px; text-align: center; }
+  #play-again-btn {
+    background: linear-gradient(135deg, #ff6b00, #ff9900);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    padding: 14px 28px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #aa4400;
+  }
+  #play-again-btn:active { transform: translateY(3px); box-shadow: none; }
+
+  /* TIMEOUT INDICATOR */
+  #timeouts {
+    display: flex;
+    justify-content: space-between;
+    font-size: 6px;
+    color: #888;
+    margin-top: 4px;
+    padding: 0 2px;
+  }
+  .to-dots { color: #00ffaa; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen">
+  <div id="title-ball">🏀</div>
+  <h1>RETRO HOOP</h1>
+  <div class="subtitle">OLD SCHOOL BASKETBALL</div>
+  <button id="start-btn" onclick="startGame()">TIP OFF!</button>
+  <div class="instructions">
+    PICK A PLAY → HIT EXECUTE<br>
+    SCORE MORE THAN THE CPU<br>
+    4 QUARTERS · 60 SEC EACH<br>
+    USE YOUR TIMEOUTS WISELY!
+  </div>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div id="gameover-screen">
+  <div id="gameover-title">FINAL BUZZER!</div>
+  <div id="final-score"></div>
+  <div id="result-msg"></div>
+  <button id="play-again-btn" onclick="resetGame()">PLAY AGAIN</button>
+</div>
+
+<!-- MAIN GAME -->
+<div id="game-container">
+  <div id="scoreboard">
+    <div class="team-score">
+      <div class="team-name">YOU</div>
+      <div class="score-num" id="player-score">0</div>
+    </div>
+    <div id="game-info">
+      <div id="quarter-display">Q1</div>
+      <div id="clock-display">1:00</div>
+      <div id="possession-arrow">▶ YOUR BALL</div>
+    </div>
+    <div class="team-score">
+      <div class="team-name">CPU</div>
+      <div class="score-num" id="cpu-score">0</div>
+    </div>
+  </div>
+
+  <div id="court-wrap">
+    <canvas id="court" width="400" height="300"></canvas>
+    <div id="msg-overlay"></div>
+  </div>
+
+  <div id="timeouts">
+    <div>YOUR TO: <span class="to-dots" id="player-to">● ● ●</span></div>
+    <div>CPU TO: <span class="to-dots" id="cpu-to">● ● ●</span></div>
+  </div>
+
+  <div id="play-area">
+    <div id="play-title">── CALL YOUR PLAY ──</div>
+    <div id="play-buttons">
+      <button class="play-btn" onclick="selectPlay('layup')">
+        <span class="play-icon">🏃</span>DRIVE LAYUP<br><span style="color:#aaa;font-size:5px">HIGH% · 2 PTS</span>
+      </button>
+      <button class="play-btn" onclick="selectPlay('midrange')">
+        <span class="play-icon">🎯</span>MID RANGE<br><span style="color:#aaa;font-size:5px">MED% · 2 PTS</span>
+      </button>
+      <button class="play-btn" onclick="selectPlay('three')">
+        <span class="play-icon">🔥</span>3-POINTER<br><span style="color:#aaa;font-size:5px">LOW% · 3 PTS</span>
+      </button>
+      <button class="play-btn" onclick="selectPlay('timeout')">
+        <span class="play-icon">⏸️</span>TIMEOUT<br><span style="color:#aaa;font-size:5px">STOP CLOCK</span>
+      </button>
+    </div>
+  </div>
+
+  <button id="execute-btn" onclick="executePlay()" disabled>SELECT A PLAY</button>
+  <div id="status-bar">TIP OFF! PICK YOUR FIRST PLAY.</div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const state = {
+  playerScore: 0, cpuScore: 0,
+  quarter: 1, clock: 60,
+  playerPoss: true,
+  playerTO: 3, cpuTO: 3,
+  selectedPlay: null,
+  running: false,
+  animating: false,
+  gameOver: false,
+  // ball animation
+  ballX: 200, ballY: 150, ballSize: 14,
+  ballTargetX: 200, ballTargetY: 60,
+  animFrame: 0, animTotal: 30,
+  animType: 'none', // 'shoot','miss','turnover'
+  showNet: false,
+};
+
+// ── CANVAS SETUP ────────────────────────────────────────────────────────
+const canvas = document.getElementById('court');
+const ctx = canvas.getContext('2d');
+
+// Scale canvas to actual pixel size
+function resizeCanvas() {
+  const wrap = document.getElementById('court-wrap');
+  canvas.width = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+}
+window.addEventListener('resize', () => { resizeCanvas(); drawCourt(); });
+
+// ── DRAW COURT ──────────────────────────────────────────────────────────
+function drawCourt() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Floor
+  const floorGrad = ctx.createLinearGradient(0, 0, 0, H);
+  floorGrad.addColorStop(0, '#c8721a');
+  floorGrad.addColorStop(1, '#a05510');
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Floor lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+
+  // Center circle
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, H*0.18, 0, Math.PI*2);
+  ctx.stroke();
+
+  // Half court line
+  ctx.beginPath();
+  ctx.moveTo(0, H/2); ctx.lineTo(W, H/2);
+  ctx.stroke();
+
+  // Paint (key) - player side (bottom)
+  const keyW = W * 0.35, keyH = H * 0.28;
+  ctx.strokeRect(W/2 - keyW/2, H - keyH, keyW, keyH);
+
+  // Paint (key) - cpu side (top)
+  ctx.strokeRect(W/2 - keyW/2, 0, keyW, keyH);
+
+  // Three point arc - player
+  ctx.beginPath();
+  ctx.arc(W/2, H, W*0.42, Math.PI, 0);
+  ctx.stroke();
+
+  // Three point arc - cpu
+  ctx.beginPath();
+  ctx.arc(W/2, 0, W*0.42, 0, Math.PI);
+  ctx.stroke();
+
+  // Hoops
+  drawHoop(W/2, H*0.09, state.playerPoss ? false : true); // CPU hoop (top) = attacking if player has ball
+  drawHoop(W/2, H*0.91, false); // Player hoop (bottom)
+
+  // Ball
+  drawBall(state.ballX * (W/400), state.ballY * (H/300));
+
+  // Net flash
+  if (state.showNet) {
+    const hY = state.playerPoss ? H*0.09 : H*0.91;
+    ctx.fillStyle = 'rgba(255,220,0,0.6)';
+    ctx.beginPath();
+    ctx.arc(W/2, hY, 18, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawHoop(x, y, attacking) {
+  const W = canvas.width, H = canvas.height;
+  // Backboard
+  ctx.fillStyle = '#ddd';
+  ctx.fillRect(x - 22, y - 6, 44, 5);
+
+  // Rim
+  ctx.strokeStyle = attacking ? '#ff4400' : '#cc3300';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x, y + 2, 13, 0, Math.PI*2);
+  ctx.stroke();
+
+  // Net lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x + i*5, y + 2);
+    ctx.lineTo(x + i*3, y + 18);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(x - 10, y + 10);
+  ctx.lineTo(x + 10, y + 10);
+  ctx.stroke();
+}
+
+function drawBall(x, y) {
+  const r = state.ballSize * (canvas.width / 400);
+  const grad = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.1, x, y, r);
+  grad.addColorStop(0, '#ff9933');
+  grad.addColorStop(1, '#cc4400');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fill();
+
+  // Seams
+  ctx.strokeStyle = 'rgba(80,20,0,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - r, y); ctx.lineTo(x + r, y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.5, 0, Math.PI);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.5, Math.PI, Math.PI*2);
+  ctx.stroke();
+}
+
+// ── ANIMATION ───────────────────────────────────────────────────────────
+let animInterval = null;
+
+function animateShot(success) {
+  state.animating = true;
+  state.animFrame = 0;
+  state.animTotal = 28;
+  state.showNet = false;
+
+  const W = 400, H = 300;
+  const startX = state.playerPoss ? W/2 + 20 : W/2 - 20;
+  const startY = state.playerPoss ? H * 0.82 : H * 0.18;
+  const targetX = W / 2;
+  const targetY = state.playerPoss ? H * 0.09 : H * 0.91;
+  const missOffX = success ? 0 : (Math.random() - 0.5) * 40;
+
+  state.ballX = startX;
+  state.ballY = startY;
+
+  if (animInterval) clearInterval(animInterval);
+  animInterval = setInterval(() => {
+    state.animFrame++;
+    const t = state.animFrame / state.animTotal;
+    // Arc trajectory
+    state.ballX = startX + (targetX + missOffX - startX) * t;
+    const arcH = state.playerPoss ? -120 : 120;
+    state.ballY = startY + (targetY - startY) * t + arcH * Math.sin(Math.PI * t);
+    state.ballSize = 14 + 4 * Math.sin(Math.PI * t);
+
+    if (state.animFrame >= state.animTotal - 3 && success) state.showNet = true;
+
+    drawCourt();
+
+    if (state.animFrame >= state.animTotal) {
+      clearInterval(animInterval);
+      state.animating = false;
+      state.showNet = false;
+      state.ballX = W/2; state.ballY = H/2; state.ballSize = 14;
+      drawCourt();
+      onAnimDone();
+    }
+  }, 30);
+}
+
+function animateTurnover() {
+  state.animating = true;
+  state.animFrame = 0;
+  state.animTotal = 20;
+  const W = 400, H = 300;
+
+  if (animInterval) clearInterval(animInterval);
+  animInterval = setInterval(() => {
+    state.animFrame++;
+    state.ballX = W/2 + Math.sin(state.animFrame * 0.8) * 30;
+    state.ballY = H/2 + Math.cos(state.animFrame * 0.8) * 20;
+    drawCourt();
+    if (state.animFrame >= state.animTotal) {
+      clearInterval(animInterval);
+      state.animating = false;
+      state.ballX = W/2; state.ballY = H/2;
+      drawCourt();
+      onAnimDone();
+    }
+  }, 40);
+}
+
+let onAnimDone = () => {};
+
+// ── PLAY LOGIC ──────────────────────────────────────────────────────────
+const plays = {
+  layup:    { chance: 0.72, pts: 2, name: 'DRIVE LAYUP' },
+  midrange: { chance: 0.52, pts: 2, name: 'MID RANGER' },
+  three:    { chance: 0.35, pts: 3, name: '3-POINTER' },
+};
+
+function selectPlay(play) {
+  if (state.animating || state.gameOver) return;
+  if (!state.playerPoss && play !== 'timeout') return;
+
+  state.selectedPlay = play;
+  document.querySelectorAll('.play-btn').forEach(b => b.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+
+  const execBtn = document.getElementById('execute-btn');
+  execBtn.disabled = false;
+  if (play === 'timeout') {
+    execBtn.textContent = '⏸ CALL TIMEOUT';
+  } else {
+    execBtn.textContent = '▶ RUN ' + (plays[play]?.name || play).toUpperCase();
+  }
+}
+
+function executePlay() {
+  if (state.animating || state.gameOver || !state.selectedPlay) return;
+
+  if (state.selectedPlay === 'timeout') {
+    callTimeout(); return;
+  }
+
+  if (!state.playerPoss) return;
+
+  const play = plays[state.selectedPlay];
+  const roll = Math.random();
+  const success = roll < play.chance;
+
+  setStatus('');
+  document.getElementById('execute-btn').disabled = true;
+  document.getElementById('execute-btn').textContent = 'SELECT A PLAY';
+  document.querySelectorAll('.play-btn').forEach(b => b.classList.remove('selected'));
+  state.selectedPlay = null;
+
+  onAnimDone = () => {
+    if (success) {
+      state.playerScore += play.pts;
+      updateScoreboard();
+      showMsg(play.pts === 3 ? '🔥 THREE!' : '🏀 NICE BUCKET!', '#ffdd00');
+      setStatus(`YOU SCORED! +${play.pts} PTS`);
+    } else {
+      showMsg('😬 MISSED!', '#ff4444');
+      setStatus('MISSED SHOT — CPU BALL');
+    }
+    // Switch possession
+    state.playerPoss = !success;
+    updatePossession();
+    // Advance clock
+    advanceClock(success ? 6 : 5);
+    setTimeout(() => {
+      if (!state.gameOver) cpuTurn();
+    }, 800);
+  };
+
+  animateShot(success);
+}
+
+function cpuTurn() {
+  if (state.playerPoss || state.gameOver) return;
+
+  // CPU decides play based on score diff & clock
+  const diff = state.cpuScore - state.playerScore;
+  let cpuPlay;
+  const r = Math.random();
+  if (diff < -6 && state.quarter >= 3) {
+    cpuPlay = r < 0.5 ? plays.three : plays.midrange;
+  } else if (diff > 8) {
+    cpuPlay = r < 0.6 ? plays.layup : plays.midrange;
+  } else {
+    cpuPlay = r < 0.4 ? plays.layup : r < 0.75 ? plays.midrange : plays.three;
+  }
+
+  // Occasionally CPU uses timeout
+  if (state.cpuTO > 0 && diff < -5 && state.clock < 15 && Math.random() < 0.3) {
+    state.cpuTO--;
+    updateTimeouts();
+    setStatus('CPU CALLS TIMEOUT!');
+    showMsg('⏸ CPU TIMEOUT', '#aaa');
+    setTimeout(() => {
+      if (!state.gameOver) cpuTurn();
+    }, 1000);
+    return;
+  }
+
+  const success = Math.random() < cpuPlay.chance;
+
+  onAnimDone = () => {
+    if (success) {
+      state.cpuScore += cpuPlay.pts;
+      updateScoreboard();
+      showMsg(cpuPlay.pts === 3 ? '😱 CPU DRAINS 3!' : '🤖 CPU SCORES!', '#ff4444');
+      setStatus(`CPU SCORED! +${cpuPlay.pts} PTS`);
+    } else {
+      showMsg('CPU MISSED!', '#00ffaa');
+      setStatus('CPU MISSED — YOUR BALL!');
+    }
+    state.playerPoss = !success;
+    updatePossession();
+    advanceClock(success ? 6 : 5);
+    enablePlayButtons();
+  };
+
+  // Simulate CPU thinking
+  setTimeout(() => {
+    if (!state.gameOver) animateShot(success);
+  }, 600);
+}
+
+// ── CLOCK / QUARTERS ────────────────────────────────────────────────────
+function advanceClock(secs) {
+  state.clock -= secs;
+  if (state.clock <= 0) {
+    endQuarter();
+  } else {
+    updateClock();
+  }
+}
+
+function endQuarter() {
+  state.clock = 0;
+  updateClock();
+  if (state.quarter >= 4) {
+    setTimeout(endGame, 600);
+    return;
+  }
+  state.quarter++;
+  state.clock = 60;
+  // Alternate possession each quarter
+  state.playerPoss = state.quarter % 2 === 1;
+  document.getElementById('quarter-display').textContent = `Q${state.quarter}`;
+  showMsg(`START OF Q${state.quarter}`, '#ffdd00');
+  updatePossession();
+  setTimeout(() => {
+    updateClock();
+    if (!state.playerPoss) cpuTurn();
+    else enablePlayButtons();
+  }, 1200);
+}
+
+function callTimeout() {
+  if (state.playerTO <= 0) {
+    showMsg('NO TIMEOUTS LEFT!', '#ff4444');
+    setStatus('OUT OF TIMEOUTS!');
+    return;
+  }
+  state.playerTO--;
+  updateTimeouts();
+  showMsg('⏸ TIMEOUT CALLED', '#fff');
+  setStatus('CLOCK STOPPED — PICK YOUR PLAY');
+  state.selectedPlay = null;
+  document.querySelectorAll('.play-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('execute-btn').textContent = 'SELECT A PLAY';
+  document.getElementById('execute-btn').disabled = true;
+}
+
+function endGame() {
+  state.gameOver = true;
+  const go = document.getElementById('gameover-screen');
+  document.getElementById('final-score').innerHTML =
+    `YOU: ${state.playerScore}<br>CPU: ${state.cpuScore}`;
+  let result;
+  if (state.playerScore > state.cpuScore) result = '🏆 YOU WIN! CHAMPION!';
+  else if (state.playerScore < state.cpuScore) result = '😞 TOUGH LOSS. TRY AGAIN!';
+  else result = '🤝 OVERTIME WOULD\'VE BEEN WILD!';
+  document.getElementById('result-msg').textContent = result;
+  go.classList.add('show');
+}
+
+// ── UI HELPERS ──────────────────────────────────────────────────────────
+function updateScoreboard() {
+  document.getElementById('player-score').textContent = state.playerScore;
+  document.getElementById('cpu-score').textContent = state.cpuScore;
+}
+
+function updateClock() {
+  const m = Math.floor(state.clock / 60);
+  const s = state.clock % 60;
+  document.getElementById('clock-display').textContent =
+    `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updatePossession() {
+  document.getElementById('possession-arrow').textContent =
+    state.playerPoss ? '▶ YOUR BALL' : '◀ CPU BALL';
+}
+
+function updateTimeouts() {
+  const dots = n => n === 3 ? '● ● ●' : n === 2 ? '● ●' : n === 1 ? '●' : '–';
+  document.getElementById('player-to').textContent = dots(state.playerTO);
+  document.getElementById('cpu-to').textContent = dots(state.cpuTO);
+}
+
+function enablePlayButtons() {
+  document.querySelectorAll('.play-btn').forEach(b => b.classList.remove('disabled'));
+}
+
+function setStatus(msg) {
+  document.getElementById('status-bar').textContent = msg;
+}
+
+let msgTimer = null;
+function showMsg(text, color = '#fff') {
+  const el = document.getElementById('msg-overlay');
+  el.textContent = text;
+  el.style.color = color;
+  el.classList.add('show');
+  if (msgTimer) clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => el.classList.remove('show'), 1100);
+}
+
+// ── GAME INIT ────────────────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('title-screen').style.display = 'none';
+  resizeCanvas();
+  state.ballX = 200; state.ballY = 150;
+  drawCourt();
+  updateScoreboard();
+  updateClock();
+  updatePossession();
+  updateTimeouts();
+  setStatus('TIP OFF! YOU HAVE THE BALL — PICK A PLAY!');
+  enablePlayButtons();
+}
+
+function resetGame() {
+  Object.assign(state, {
+    playerScore: 0, cpuScore: 0,
+    quarter: 1, clock: 60,
+    playerPoss: true,
+    playerTO: 3, cpuTO: 3,
+    selectedPlay: null,
+    animating: false,
+    gameOver: false,
+    ballX: 200, ballY: 150, ballSize: 14,
+    showNet: false,
+  });
+  document.getElementById('quarter-display').textContent = 'Q1';
+  document.getElementById('gameover-screen').classList.remove('show');
+  document.getElementById('execute-btn').textContent = 'SELECT A PLAY';
+  document.getElementById('execute-btn').disabled = true;
+  document.querySelectorAll('.play-btn').forEach(b => b.classList.remove('selected'));
+  updateScoreboard();
+  updateClock();
+  updatePossession();
+  updateTimeouts();
+  drawCourt();
+  setStatus('NEW GAME! YOU HAVE THE BALL — PICK A PLAY!');
+  enablePlayButtons();
+}
+
+// Initial draw
+resizeCanvas();
+drawCourt();
+</script>
+</body>
+</html>
